@@ -1,21 +1,5 @@
+const dbConfig = require('../../data/db-config')
 const Account = require('./accounts-model')
-const yup = require('yup')
-
-const nameSchema = yup.object().shape({
-  name: yup
-    .string()
-    .typeError("name of account must be a string")
-    .trim()
-    .min(3)
-    .max(100, "name of account must be between 3 and 100")
-})
-
-const budgetSchema = yup.object().shape({
-  budget: yup
-    .number()
-    .min(0)
-    .max(1000000, )
-})
 
 async function checkAccountPayload(req, res, next) {
   const { name, budget } = req.body
@@ -27,9 +11,9 @@ async function checkAccountPayload(req, res, next) {
     res.status(400).json({message: "name of account must be a string"})
   } else if (name.trim().length < 3 || name.trim().length > 100) {
     res.status(400).json({message: "name of account must be between 3 and 100"})
-  } else if (typeof budget !== 'number') {
+  } else if (typeof budget !== 'number' || isNaN(budget)) {
     res.status(400).json({message: "budget of account must be a number"})
-  } else if (budget < 0 || budget > 100) {
+  } else if (budget < 0 || budget > 1000000) {
     res.status(400).json({message: "budget of account is too large or too small"})
   } else {
     next()
@@ -37,11 +21,20 @@ async function checkAccountPayload(req, res, next) {
 }
 
 async function checkAccountNameUnique(req, res, next) {
-  const { name } = req.body
-  if (!name || typeof name !== 'string' || !name.trim()) {
-    next ({ code: 400, message: 'name is required' })
-  } else {
-    next()
+  try {
+    const existing = await dbConfig('accounts')
+      .where('name', req.body.name.trim())
+      .first()
+
+    if (existing) {
+      res.status(400).json({
+        message: "that name is taken"
+      })
+    } else {
+      next()
+    }
+  } catch (err) {
+    next(err)
   }
 }
 
